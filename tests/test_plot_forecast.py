@@ -4,6 +4,7 @@ import numpy as np
 
 from scripts.plot_etth1_forecast import (
     build_plot_frame,
+    dataset_csv_path,
     ensure_project_root_on_path,
     save_forecast_plot,
 )
@@ -52,3 +53,9 @@ def test_ensure_project_root_on_path_restores_script_import_path(monkeypatch):
     ensure_project_root_on_path()
 
     assert sys.path[0] == project_root
+
+
+def test_dataset_csv_path_selects_etth2_file():
+    assert dataset_csv_path(Path("dataset"), "etth2") == Path(
+        "dataset/ETT-small/ETTh2.csv"
+    )

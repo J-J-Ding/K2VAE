@@ -1,4 +1,4 @@
-"""Plot an ETTh1 forecast from a trained K2VAE checkpoint."""
+"""Plot an ETT hourly forecast from a trained K2VAE checkpoint."""
 
 from __future__ import annotations
 
@@ -12,6 +12,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+
+DATASET_FILENAMES = {
+    "etth1": "ETTh1.csv",
+    "etth2": "ETTh2.csv",
+}
+
+
+def dataset_csv_path(data_root: Path, dataset_name: str) -> Path:
+    """Return the local CSV path for a supported ETT hourly dataset."""
+    return data_root / "ETT-small" / DATASET_FILENAMES[dataset_name.lower()]
 
 
 def ensure_project_root_on_path() -> None:
@@ -63,6 +74,7 @@ def save_forecast_plot(
     png_path: Path,
     csv_path: Path,
     variable_name: str,
+    dataset_name: str = "etth1",
 ) -> None:
     """Save a forecast line chart and its underlying values."""
     png_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +118,7 @@ def save_forecast_plot(
         label="10%-90% interval",
     )
     ax.axvline(0, color="#6b7280", linestyle="--", linewidth=1)
-    ax.set_title(f"K2VAE ETTh1 Forecast - {variable_name}")
+    ax.set_title(f"K2VAE {dataset_name.upper()} Forecast - {variable_name}")
     ax.set_xlabel("Step (forecast starts after 0)")
     ax.set_ylabel(variable_name)
     ax.grid(alpha=0.2)
@@ -119,10 +131,11 @@ def save_forecast_plot(
 def generate_prediction(
     checkpoint_path: Path,
     data_root: Path,
+    dataset_name: str,
     variable_name: str,
     num_samples: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
-    """Run the first ETTh1 test window and return denormalized arrays."""
+    """Run the first ETT test window and return denormalized arrays."""
     ensure_project_root_on_path()
     import torch
     from torch.utils.data import DataLoader
@@ -136,11 +149,10 @@ def generate_prediction(
         checkpoint["datamodule_hyper_parameters"]["data_manager"]["init_args"]
     )
     data_args["path"] = str(data_root)
+    data_args["dataset"] = dataset_name
     data_manager = DataManager(**data_args)
 
-    columns = pd.read_csv(
-        data_root / "ETT-small" / "ETTh1.csv", nrows=0
-    ).columns.tolist()[1:]
+    columns = pd.read_csv(dataset_csv_path(data_root, dataset_name), nrows=0).columns.tolist()[1:]
     if variable_name not in columns:
         raise ValueError(
             f"Unknown variable {variable_name!r}; choose one of: {', '.join(columns)}"
@@ -193,6 +205,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--data-root", type=Path, default=Path("dataset"))
+    parser.add_argument("--dataset", choices=sorted(DATASET_FILENAMES), default="etth1")
     parser.add_argument("--variable", default="OT")
     parser.add_argument("--num-samples", type=int, default=10)
     parser.add_argument("--output-dir", type=Path, default=Path("results/figures"))
@@ -202,14 +215,17 @@ def main() -> None:
     history, actual, samples, variable_index = generate_prediction(
         checkpoint_path,
         args.data_root,
+        args.dataset,
         args.variable,
         args.num_samples,
     )
     frame = build_plot_frame(history, actual, samples, variable_index)
-    stem = f"etth1_{args.variable.lower()}_forecast"
+    stem = f"{args.dataset}_{args.variable.lower()}_forecast"
     png_path = args.output_dir / f"{stem}.png"
     csv_path = args.output_dir / f"{stem}.csv"
-    save_forecast_plot(frame, png_path, csv_path, args.variable)
+    save_forecast_plot(
+        frame, png_path, csv_path, args.variable, dataset_name=args.dataset
+    )
     print(f"Saved chart: {png_path.resolve()}")
     print(f"Saved data:  {csv_path.resolve()}")
 

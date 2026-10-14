@@ -167,3 +167,14 @@ cython_debug/
 
 log/
 .vscode/
+
+# Local datasets and generated training artifacts
+/dataset/
+/results/
+/r/
+/checkpoints/*
+!/checkpoints/README.md
+*.ckpt
+
+# Temporary pytest directories created in the repository root
+/pytest-cache-files-*/
